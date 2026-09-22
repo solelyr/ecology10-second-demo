@@ -1,0 +1,14 @@
+.gradle/
+.idea/
+**/build/
+debug/*.local.ps1
+tmp/
+
+# 从运行环境复制的本地编译依赖和配置
+secDevClasses/
+secDevLib/
+devLib/
+
+*.iml
+*.log
+hs_err_pid*

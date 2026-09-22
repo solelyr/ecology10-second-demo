@@ -1,0 +1,91 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Tomcat 9.0.118" type="#com.intellij.j2ee.web.tomcat.TomcatRunConfigurationFactory" factoryName="Local" APPLICATION_SERVER_NAME="Tomcat 9.0.118" ALTERNATIVE_JRE_ENABLED="false" nameIsGenerated="true">
+    <option name="OPEN_IN_BROWSER_URL" value="http://localhost:8030" />
+    <option name="COMMON_VM_ARGUMENTS" value="-Dweaver.allinone.configcenter.address=http://192.168.1.223:10600 -Dweaver.remote.discovery.server-addr=http://192.168.1.223:23000 -Ddubbo.protocol.port=26044 -Ddubbo.protocol.host=0.0.0.0 -Xms1024m -Xmx2048m -Dspring.profiles.active=txproduction -Denv=txproduction -Dlog.console.level=DEBUG -Dfile.encoding=UTF-8 -Dsun.jnu.encoding=UTF-8 -Dsun.reflect.inflationThreshold=2147483547 -XX:+UseConcMarkSweepGC -XX:-OmitStackTraceInFastThrow -XX:+UseParNewGC -XX:+DisableExplicitGC -Dweaver.deploy=private -Dfile.encoding=UTF-8 -noverify -Dweaver.allinone=false -Dweaver.framework.registrycenter.enabled=false -Dweaver.framework.configcenter.enabled=false -XX:MaxDirectMemorySize=1500m -XX:MaxMetaspaceSize=2048m -XX:+UseConcMarkSweepGC -XX:+UseParNewGC -Dsun.reflect.inflationThreshold=2147483547 -XX:-OmitStackTraceInFastThrow -DisUseParallelRunner=true -DisUseParallelMybatisParse=true -DisUseParallelAddMapper=true -DisUseParallelSmartSingleton=true -DisUseCacheFilterType=true -DisUseAsyncFinishRefresh=true -DisUseBindTypeCache=true -DisBeanCache=true -DisBeanLazy=true -DisAopFilter=true -DisUseAsyncCacheFactoryBean=true -DisOpenPreloadResources=false" />
+    <option name="UPDATING_POLICY" value="restart-server" />
+    <deployment>
+      <artifact name="Gradle : ecology10-second-demo : secondev-solelyr-demo.war (exploded)">
+        <settings>
+          <option name="CONTEXT_PATH" value="/" />
+        </settings>
+      </artifact>
+    </deployment>
+    <server-settings>
+      <option name="BASE_DIRECTORY_NAME" value="8b44f352-2094-4d4d-83ee-22cedf3cbb70" />
+      <option name="HTTP_PORT" value="8030" />
+    </server-settings>
+    <predefined_log_file enabled="true" id="Tomcat" />
+    <predefined_log_file enabled="true" id="Tomcat Catalina" />
+    <predefined_log_file id="Tomcat Manager" />
+    <predefined_log_file id="Tomcat Host Manager" />
+    <predefined_log_file id="Tomcat Localhost Access" />
+    <RunnerSettings RunnerId="Debug">
+      <option name="DEBUG_PORT" value="3606" />
+    </RunnerSettings>
+    <ConfigurationWrapper VM_VAR="JAVA_OPTS" RunnerId="Cover">
+      <option name="USE_ENV_VARIABLES" value="true" />
+      <STARTUP>
+        <option name="USE_DEFAULT" value="true" />
+        <option name="SCRIPT" value="" />
+        <option name="VM_PARAMETERS" value="" />
+        <option name="PROGRAM_PARAMETERS" value="" />
+      </STARTUP>
+      <SHUTDOWN>
+        <option name="USE_DEFAULT" value="true" />
+        <option name="SCRIPT" value="" />
+        <option name="VM_PARAMETERS" value="" />
+        <option name="PROGRAM_PARAMETERS" value="" />
+      </SHUTDOWN>
+    </ConfigurationWrapper>
+    <ConfigurationWrapper VM_VAR="JAVA_OPTS" RunnerId="Debug">
+      <option name="USE_ENV_VARIABLES" value="true" />
+      <STARTUP>
+        <option name="USE_DEFAULT" value="true" />
+        <option name="SCRIPT" value="" />
+        <option name="VM_PARAMETERS" value="" />
+        <option name="PROGRAM_PARAMETERS" value="" />
+      </STARTUP>
+      <SHUTDOWN>
+        <option name="USE_DEFAULT" value="true" />
+        <option name="SCRIPT" value="" />
+        <option name="VM_PARAMETERS" value="" />
+        <option name="PROGRAM_PARAMETERS" value="" />
+      </SHUTDOWN>
+    </ConfigurationWrapper>
+    <ConfigurationWrapper VM_VAR="JAVA_OPTS" RunnerId="Profile">
+      <option name="USE_ENV_VARIABLES" value="true" />
+      <STARTUP>
+        <option name="USE_DEFAULT" value="true" />
+        <option name="SCRIPT" value="" />
+        <option name="VM_PARAMETERS" value="" />
+        <option name="PROGRAM_PARAMETERS" value="" />
+      </STARTUP>
+      <SHUTDOWN>
+        <option name="USE_DEFAULT" value="true" />
+        <option name="SCRIPT" value="" />
+        <option name="VM_PARAMETERS" value="" />
+        <option name="PROGRAM_PARAMETERS" value="" />
+      </SHUTDOWN>
+    </ConfigurationWrapper>
+    <ConfigurationWrapper VM_VAR="JAVA_OPTS" RunnerId="Run">
+      <option name="USE_ENV_VARIABLES" value="true" />
+      <STARTUP>
+        <option name="USE_DEFAULT" value="true" />
+        <option name="SCRIPT" value="" />
+        <option name="VM_PARAMETERS" value="" />
+        <option name="PROGRAM_PARAMETERS" value="" />
+      </STARTUP>
+      <SHUTDOWN>
+        <option name="USE_DEFAULT" value="true" />
+        <option name="SCRIPT" value="" />
+        <option name="VM_PARAMETERS" value="" />
+        <option name="PROGRAM_PARAMETERS" value="" />
+      </SHUTDOWN>
+    </ConfigurationWrapper>
+    <method v="2">
+      <option name="BuildArtifacts" enabled="true">
+        <artifact name="Gradle : ecology10-second-demo : secondev-solelyr-demo.war (exploded)" />
+      </option>
+    </method>
+  </configuration>
+</component>

@@ -1,0 +1,73 @@
+plugins{
+    id 'java'
+    // 仅用于本地 Tomcat Debug/IDEA 的 war exploded 模型。
+    // 默认 war 任务在下方禁用，线上 build 仍然只产出 JAR 和 build.zip。
+    id 'war'
+}
+description = "solelyr 二开模块"
+
+dependencies {
+  // 子项目私有依赖添加
+}
+
+// 防止应用 war 插件后改变线上构建产物。
+war {
+    enabled = false
+}
+
+tasks.named('assemble') {
+    dependsOn tasks.named('jar')
+}
+
+def debugExplodedDir = layout.buildDirectory.dir("libs/exploded/${project.name}.war")
+
+tasks.register('prepareDebugWar', Sync) {
+    group = 'debug'
+    description = '生成供本地 Tomcat 使用的 exploded WAR（不影响线上 build.zip）'
+    dependsOn tasks.named('classes')
+    into debugExplodedDir
+
+    doFirst {
+        def platformClasses = rootProject.file('secDevClasses')
+        def platformLibs = rootProject.file('secDevLib')
+        if (!platformClasses.isDirectory() || !platformLibs.isDirectory()) {
+            throw new GradleException('Debug 启动前必须准备 secDevClasses 和 secDevLib。')
+        }
+    }
+
+    // E10 服务运行时：从服务器 WEB-INF/classes、WEB-INF/lib 拉取的内容。
+    from(rootProject.file('secDevClasses')) {
+        into 'WEB-INF/classes'
+    }
+    from(rootProject.fileTree('secDevLib') { include '**/*.jar' }) {
+        into 'WEB-INF/lib'
+    }
+    from(rootProject.fileTree('devLib') { include '**/*.jar' }) {
+        into 'WEB-INF/lib'
+    }
+
+    // Debug 模式允许资源进入 WEB-INF/classes；模块编译结果最后复制，优先级最高。
+    from('src/main/resources') {
+        into 'WEB-INF/classes'
+    }
+    from(sourceSets.main.output.classesDirs) {
+        into 'WEB-INF/classes'
+    }
+}
+
+tasks.register('debugWar', War) {
+    group = 'debug'
+    description = '把 exploded WAR 压缩为仅供本地排查使用的 WAR'
+    dependsOn tasks.named('prepareDebugWar')
+    from(debugExplodedDir)
+    archiveBaseName.set(project.name)
+    archiveVersion.set('')
+    destinationDirectory.set(layout.buildDirectory.dir('libs/debug'))
+}
+
+// 与手册中的任务名称保持一致，便于从 Gradle 面板执行。
+tasks.register('explodeWar') {
+    group = 'debug'
+    description = 'prepareDebugWar 的兼容别名'
+    dependsOn tasks.named('prepareDebugWar')
+}

@@ -1,0 +1,8 @@
+plugins{
+    id 'java'
+}
+description = "流程二开模块"
+
+dependencies {
+  // 子项目私有依赖添加
+}
