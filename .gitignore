@@ -12,3 +12,5 @@ devLib/
 *.iml
 *.log
 hs_err_pid*
+/secondev-yaolilin-demo/
+/gradle-e10-file-manifest/

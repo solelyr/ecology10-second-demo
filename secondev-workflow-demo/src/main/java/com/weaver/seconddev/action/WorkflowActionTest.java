@@ -5,23 +5,24 @@ import com.weaver.seconddev.util.WorkflowUtil;
 import com.weaver.verupgrade.soa.workflow.request.RequestInfo;
 import org.springframework.stereotype.Service;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * @USER: solelyr
+ * @DATE: 2026/6/22 16:33
+ * @DESCRIPTION: 演示通过旧版流程上下文读取主表和明细表数据
+ */
 @Service("workflowActionTest")
 public class WorkflowActionTest extends WorkflowAction {
     @Override
     public WeaResult<Map<String, Object>> doExecute(RequestInfo requestInfo) {
-        Map<String, Object> result = new HashMap<>();
-        result.put("requestId", requestInfo.getRequestid());
-        result.put("mainData", WorkflowUtil.getMainData(requestInfo));
+//        if(true) throw new RuntimeException("测试异常");
+        String requestId = requestInfo.getRequestid();
+        Map<String,Object> mainData = WorkflowUtil.getMainData(requestInfo);
+        List<Map<String,Object>> dataList = WorkflowUtil.getDetailData(requestInfo,0);
+        List<Map<String,Object>> dataList_1 = WorkflowUtil.getDetailData(requestInfo,1);
 
-        List<Map<String, Object>> firstDetail = WorkflowUtil.getDetailData(requestInfo, 0);
-        if (!firstDetail.isEmpty()) {
-            result.put("firstDetail", firstDetail);
-        }
-
-        return WeaResult.success(result);
+        return WeaResult.success();
     }
 }

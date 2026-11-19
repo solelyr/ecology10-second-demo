@@ -13,9 +13,15 @@ import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.*;
 import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
 
+/**
+ * @USER: solelyr
+ * @DATE: 2026/09/22 11:02
+ * @DESCRIPTION: 为二开 JAR 写入资源与源码清单并生成部署 ZIP
+ */
 public class BuildArchPlugin implements Plugin<Project> {
 
     private void readResourcePathList(String rootPath, Set<String> pathList) {
@@ -86,6 +92,24 @@ public class BuildArchPlugin implements Plugin<Project> {
         return absPaths;
     }
 
+    private void addPackagedSources(File jarFile, Set<String> srcPaths) {
+        try (ZipFile archive = new ZipFile(jarFile)) {
+            archive.stream()
+                    .filter(entry -> !entry.isDirectory() && entry.getName().endsWith(".java"))
+                    .map(ZipEntry::getName)
+                    .filter(name -> !name.startsWith("META-INF/"))
+                    .forEach(name -> {
+                        srcPaths.add(name);
+                        for (int slash = name.lastIndexOf('/'); slash >= 0; slash = name.lastIndexOf('/')) {
+                            name = name.substring(0, slash);
+                            srcPaths.add(name);
+                        }
+                    });
+        } catch (IOException e) {
+            throw new GradleException("Failed to list Java sources in " + jarFile, e);
+        }
+    }
+
     @Override
     public void apply(Project project) {
         // 扫描 项目下的resources 文件内容
@@ -111,6 +135,7 @@ public class BuildArchPlugin implements Plugin<Project> {
                         readResourcePathList(moduleProjectFile.getPath() + "/src/main/java", srcList);
                         Set<String> resAbsPath = calcAbsPathList(moduleProjectFile.getPath() + "/src/main/resources", resourcesList);
                         Set<String> srcAbsPath = calcAbsPathList(moduleProjectFile.getPath() + "/src/main/java", srcList);
+                        addPackagedSources(jarFile, srcAbsPath);
                         addResourceListToJar(libJarPath, resAbsPath, "res.list");
                         addResourceListToJar(libJarPath, srcAbsPath, "src.list");
                         createBuildZip(libJarPath);

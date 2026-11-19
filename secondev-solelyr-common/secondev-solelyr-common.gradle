@@ -1,0 +1,200 @@
+plugins{
+    id 'java'
+    id 'com.weaver.seconddev.solelyr-file-manifest'
+    // 发布 jar 到私有 Nexus。
+    id 'maven-publish'
+    // 仅用于本地 Tomcat Debug/IDEA 的 war exploded 模型。
+    // 默认 war 任务在下方禁用，线上 build 仍然只产出 JAR 和 build.zip。
+    id 'war'
+}
+description = "solelyr 二开模块"
+
+// ===================== 二开 JAR 名称与版本 =====================
+// 直接修改下面两个默认值，或构建时用 -PjarName=xxx -PjarVersion=x.y.z 临时覆盖。
+//   - jarVersion 为空：生成 build/libs/<jarName>.jar
+//   - jarVersion 非空：生成 build/libs/<jarName>-<jarVersion>.jar，并写入 MANIFEST 的 Implementation-Version
+// build.zip 由 BuildArchPlugin 按 archiveBaseName/archiveVersion 定位 jar，
+// 因此只能通过这两项改名，不要再设置 archiveFileName、archiveClassifier 或 archiveAppendix。
+// 注意：-P 参数对本次构建的所有模块生效，同时构建多个模块时请改用下方默认值。
+def defaultJarName = project.name
+def defaultJarVersion = '261101-1.0.0-SNAPSHOT'
+
+def customJarName = (findProperty('jarName') ?: defaultJarName).toString().trim()
+def customJarVersion = (findProperty('jarVersion') ?: defaultJarVersion).toString().trim()
+if (!(customJarName ==~ /[A-Za-z0-9][A-Za-z0-9._-]*/)) {
+    throw new GradleException("jarName 只能包含字母、数字、点、下划线和中划线，且不能为空：${customJarName}")
+}
+if (customJarVersion && !(customJarVersion ==~ /[A-Za-z0-9][A-Za-z0-9._-]*/)) {
+    throw new GradleException("jarVersion 只能包含字母、数字、点、下划线和中划线：${customJarVersion}")
+}
+
+jar {
+    archiveBaseName.set(customJarName)
+    if (customJarVersion) {
+        archiveVersion.set(customJarVersion)
+        manifest {
+            attributes 'Implementation-Version': customJarVersion
+        }
+    }
+}
+
+// ===================== 自动上传到私有 Nexus =====================
+// 地址和账号不写在本文件，按以下优先级读取（Gradle 属性优先，其次环境变量）：
+//   nexusReleasesUrl  / NEXUS_RELEASES_URL   正式版 hosted 仓库地址
+//   nexusSnapshotsUrl / NEXUS_SNAPSHOTS_URL  快照版 hosted 仓库地址（版本以 -SNAPSHOT 结尾时使用）
+//   nexusUsername     / NEXUS_USERNAME       上传账号
+//   nexusPassword     / NEXUS_PASSWORD       上传密码或令牌
+// 仓库地址建议写在项目根目录 gradle.properties；账号密码写在 C:\Users\<用户>\.gradle\gradle.properties，不要提交到代码仓库。
+// 配置地址后，执行 build 会在构建完成后自动上传；临时不上传时加 -PnexusAutoPublish=false。
+// 发布坐标：groupId 默认取根工程 group（可用 -PpublishGroupId 覆盖），artifactId = jarName，
+// version = jarVersion；jarVersion 为空时使用根工程 version。
+def nexusSetting = { String key, String env ->
+    (findProperty(key) ?: System.getenv(env) ?: '').toString().trim()
+}
+def publishGroupId = (findProperty('publishGroupId') ?: rootProject.group).toString().trim()
+def publishVersion = customJarVersion ?: rootProject.version.toString()
+def nexusUrl = publishVersion.endsWith('-SNAPSHOT')
+        ? nexusSetting('nexusSnapshotsUrl', 'NEXUS_SNAPSHOTS_URL')
+        : nexusSetting('nexusReleasesUrl', 'NEXUS_RELEASES_URL')
+def nexusUsername = nexusSetting('nexusUsername', 'NEXUS_USERNAME')
+def nexusPassword = nexusSetting('nexusPassword', 'NEXUS_PASSWORD')
+def nexusAutoPublish = (findProperty('nexusAutoPublish') ?: 'true').toString().toBoolean()
+
+publishing {
+    publications {
+        secondevJar(MavenPublication) {
+            groupId = publishGroupId
+            artifactId = customJarName
+            version = publishVersion
+            // 发布 jar 任务产物（BuildArchPlugin 已写入 res.list/src.list 后的 jar）。
+            artifact jar
+        }
+    }
+    repositories {
+        if (nexusUrl) {
+            maven {
+                name = 'privateNexus'
+                url = uri(nexusUrl)
+                // 仅当地址为 http:// 时允许明文传输；建议使用 https。
+                allowInsecureProtocol = nexusUrl.startsWith('http://')
+                credentials {
+                    username = nexusUsername
+                    password = nexusPassword
+                }
+                // 预先发送 Basic 认证：Nexus 开启匿名访问时会对未带账号的请求直接返回 403，
+                // Gradle 默认等待 401 才补发账号，因此需要主动发送。
+                authentication {
+                    basic(BasicAuthentication)
+                }
+            }
+        }
+    }
+}
+
+if (nexusUrl) {
+    tasks.matching { it.name == 'publishSecondevJarPublicationToPrivateNexusRepository' }.configureEach {
+        doFirst {
+            if (!nexusUsername || !nexusPassword) {
+                throw new GradleException('已配置 Nexus 地址，但缺少 nexusUsername / nexusPassword（或 NEXUS_USERNAME / NEXUS_PASSWORD）')
+            }
+            logger.lifecycle("上传 ${publishGroupId}:${customJarName}:${publishVersion} 到 ${nexusUrl}")
+        }
+    }
+    if (nexusAutoPublish) {
+        tasks.named('build') {
+            finalizedBy 'publishSecondevJarPublicationToPrivateNexusRepository'
+        }
+    }
+} else if (nexusAutoPublish) {
+    tasks.named('build') {
+        doLast {
+            logger.lifecycle('未配置 Nexus 仓库地址（nexusReleasesUrl / nexusSnapshotsUrl），跳过上传。')
+        }
+    }
+}
+
+dependencies {
+  // 子项目私有依赖添加
+}
+
+// 防止应用 war 插件后改变线上构建产物。
+war {
+    enabled = false
+}
+
+tasks.named('assemble') {
+    dependsOn tasks.named('jar')
+}
+
+def debugExplodedDir = layout.buildDirectory.dir("libs/exploded/${project.name}.war")
+
+tasks.register('prepareDebugWar', Sync) {
+    group = 'debug'
+    description = '生成供本地 Tomcat 使用的 exploded WAR（不影响线上 build.zip）'
+    dependsOn tasks.named('classes')
+    into debugExplodedDir
+
+    doFirst {
+        def platformClasses = rootProject.file('secDevClasses')
+        def platformLibs = rootProject.file('secDevLib')
+        if (!platformClasses.isDirectory() || !platformLibs.isDirectory()) {
+            throw new GradleException('Debug 启动前必须准备 secDevClasses 和 secDevLib。')
+        }
+    }
+
+    // E10 服务运行时：从服务器 WEB-INF/classes、WEB-INF/lib 拉取的内容。
+    from(rootProject.file('secDevClasses')) {
+        into 'WEB-INF/classes'
+    }
+    from(rootProject.fileTree('secDevLib') { include '**/*.jar' }) {
+        into 'WEB-INF/lib'
+    }
+    from(rootProject.fileTree('devLib') { include '**/*.jar' }) {
+        into 'WEB-INF/lib'
+    }
+
+    // Debug 模式允许资源进入 WEB-INF/classes；模块编译结果最后复制，优先级最高。
+    from('src/main/resources') {
+        into 'WEB-INF/classes'
+    }
+    from(sourceSets.main.output.classesDirs) {
+        into 'WEB-INF/classes'
+    }
+}
+
+tasks.register('debugWar', War) {
+    group = 'debug'
+    description = '把 exploded WAR 压缩为仅供本地排查使用的 WAR'
+    dependsOn tasks.named('prepareDebugWar')
+    from(debugExplodedDir)
+    archiveBaseName.set(project.name)
+    archiveVersion.set('')
+    destinationDirectory.set(layout.buildDirectory.dir('libs/debug'))
+}
+
+// 与手册中的任务名称保持一致，便于从 Gradle 面板执行。
+tasks.register('explodeWar') {
+    group = 'debug'
+    description = 'prepareDebugWar 的兼容别名'
+    dependsOn tasks.named('prepareDebugWar')
+}
+
+// Claude 通用流程表单查询组件：离线 RPC 替身测试，不访问真实环境。
+['ColumnNameResolverTest': 'com.weaver.seconddev.solelyr.workflow.util.ColumnNameResolverTest',
+ 'WorkflowFormQueryServiceTest': 'com.weaver.seconddev.solelyr.workflow.service.WorkflowFormQueryServiceTest',
+ 'WorkflowEsbActionTest': 'com.weaver.seconddev.solelyr.workflow.action.WorkflowEsbActionTest'].each { name, cls ->
+    tasks.register("solelyr${name}", JavaExec) {
+        group = 'verification'
+        description = "离线运行 ${cls}"
+        dependsOn tasks.named('testClasses')
+        classpath = sourceSets.test.output + sourceSets.main.output + sourceSets.test.runtimeClasspath
+        mainClass.set(cls)
+        systemProperty 'file.encoding', 'UTF-8'
+    }
+}
+
+tasks.register('solelyrWorkflowFormTest') {
+    group = 'verification'
+    description = '运行 com.weaver.seconddev.solelyr 全部离线测试'
+    dependsOn 'solelyrColumnNameResolverTest', 'solelyrWorkflowFormQueryServiceTest', 'solelyrWorkflowEsbActionTest'
+}

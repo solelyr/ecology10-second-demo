@@ -1,8 +1,63 @@
 plugins{
     id 'java'
+    id 'com.weaver.seconddev.solelyr-file-manifest'
 }
-description = "流程二开模块"
+description = 'E10 流程 Action 与接口示例'
+
+def commonDependency = 'com.weaver.seconddev:secondev-solelyr-common:261101-1.0.0-SNAPSHOT'
+
+repositories {
+    maven {
+        name = 'solelyrEcologySnapshots'
+        url = uri('https://nexus.solelyz.cn/repository/solelyr-ecology10-Snapshot/')
+        credentials {
+            username = project.findProperty('nexusUsername') ?: System.getenv('NEXUS_USERNAME')
+            password = project.findProperty('nexusPassword') ?: System.getenv('NEXUS_PASSWORD')
+        }
+        authentication {
+            basic(BasicAuthentication)
+        }
+        content {
+            includeModule('com.weaver.seconddev', 'secondev-solelyr-common')
+        }
+    }
+}
+
+configurations {
+    embeddedCommon {
+        canBeConsumed = false
+        transitive = false
+    }
+}
 
 dependencies {
-  // 子项目私有依赖添加
+    implementation commonDependency
+    embeddedCommon commonDependency
+}
+
+def workflowClasses = sourceSets.main.output.classesDirs
+def mergedJars = configurations.embeddedCommon
+
+def validateWorkflowServiceNames = tasks.register('validateWorkflowServiceNames') {
+    group = 'verification'
+    description = '检查部署 JAR 中工作流处理器的 Spring Service 名称冲突'
+    dependsOn workflowClasses, mergedJars
+    inputs.files(workflowClasses, mergedJars).withPathSensitivity(PathSensitivity.RELATIVE)
+    doLast {
+        com.solelyr.gradle.plugin.WorkflowServiceNames.validate(project, workflowClasses, mergedJars)
+    }
+}
+
+tasks.named('jar', Jar) {
+    dependsOn validateWorkflowServiceNames
+    // 将同一版本公共包中的编译类和 Java 源码合入部署 JAR。
+    from({ mergedJars.files.collect { zipTree(it) } }) {
+        include '**/*.class', '**/*.java'
+        exclude 'META-INF/**', 'module-info.class', 'module-info.java'
+        duplicatesStrategy = DuplicatesStrategy.FAIL
+    }
+}
+
+configurations.all {
+    resolutionStrategy.cacheChangingModulesFor 0, 'seconds'
 }

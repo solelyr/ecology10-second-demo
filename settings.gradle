@@ -1,7 +1,5 @@
-
 // 根项目名
 rootProject.name = 'ecology10-second-demo'
-
 
 def projectNames = []
 def discoverProjects

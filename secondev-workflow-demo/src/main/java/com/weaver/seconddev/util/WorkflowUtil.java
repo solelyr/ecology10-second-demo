@@ -6,6 +6,11 @@ import java.util.List;
 import java.util.Map;
 import com.weaver.verupgrade.soa.workflow.request.*;
 
+/**
+ * @USER: solelyr
+ * @DATE: 2026/09/22 11:02
+ * @DESCRIPTION: 从流程请求中提取主表和明细表数据
+ */
 public class WorkflowUtil {
     private WorkflowUtil() {
     }
