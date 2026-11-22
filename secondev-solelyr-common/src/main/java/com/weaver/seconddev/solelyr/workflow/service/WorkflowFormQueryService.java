@@ -1,5 +1,6 @@
 package com.weaver.seconddev.solelyr.workflow.service;
 
+import com.weaver.seconddev.solelyr.workflow.exception.WorkflowErrors;
 import com.weaver.common.form.data.FormData;
 import com.weaver.common.form.data.detail.FileDetail;
 import com.weaver.common.form.data.detail.FormDataDetail;
@@ -15,7 +16,6 @@ import com.weaver.common.form.physical.service.FormTableService;
 import com.weaver.common.hrm.util.HrmContextUtil;
 import com.weaver.framework.rpc.annotation.RpcReference;
 import com.weaver.seconddev.solelyr.workflow.exception.WorkflowEsbException;
-import com.weaver.seconddev.solelyr.workflow.exception.WorkflowEsbException.Kind;
 import com.weaver.seconddev.solelyr.workflow.model.WorkflowFieldInfo;
 import com.weaver.seconddev.solelyr.workflow.model.WorkflowEsbForm;
 import com.weaver.seconddev.solelyr.workflow.util.ColumnNameResolver;
@@ -86,7 +86,7 @@ public class WorkflowFormQueryService {
      */
     public WorkflowEsbForm query(long requestId, Long employeeId, String tenantKey) {
         if (employeeId == null || employeeId <= 0 || ColumnNameResolver.trimToNull(tenantKey) == null) {
-            throw new WorkflowEsbException(Kind.VALIDATION, "缺少有效的操作用户或租户");
+            throw new WorkflowEsbException(WorkflowErrors.USER_CONTEXT_INVALID, "缺少有效的操作用户或租户");
         }
         return query(requestId, HrmContextUtil.build(employeeId, tenantKey.trim()));
     }
@@ -102,16 +102,16 @@ public class WorkflowFormQueryService {
         validate(requestId, employee);
         WfcRequestRpcEntity request = requestRest.getRequestEntity(requestId, employee);
         if (request == null || request.getRequestId() != requestId || request.getWorkflowId() <= 0) {
-            throw new WorkflowEsbException(Kind.NOT_FOUND, "未找到流程实例：" + requestId);
+            throw new WorkflowEsbException(WorkflowErrors.REQUEST_NOT_FOUND, "未找到流程实例：" + requestId);
         }
         RequestFormInfoEntity relation = relatedForm(request.getFormInfos());
         List<FormField> fields = fieldRest.findFieldByWorkflowId(request.getWorkflowId(), employee);
         if (fields == null || fields.isEmpty()) {
-            throw new WorkflowEsbException(Kind.METADATA, "未查询到流程表单字段定义：" + request.getWorkflowId());
+            throw new WorkflowEsbException(WorkflowErrors.FIELD_METADATA_INVALID, "未查询到流程表单字段定义：" + request.getWorkflowId());
         }
         FormData formData = fieldRest.getFormDataByRequestId(Long.valueOf(requestId), employee);
         if (formData == null) {
-            throw new WorkflowEsbException(Kind.NOT_FOUND, "未查询到流程表单数据：" + requestId);
+            throw new WorkflowEsbException(WorkflowErrors.FORM_NOT_FOUND, "未查询到流程表单数据：" + requestId);
         }
 
         long formId = relation.getRelateFormObj().getRelateKey();
@@ -149,14 +149,14 @@ public class WorkflowFormQueryService {
      */
     private void validate(long requestId, SimpleEmployee employee) {
         if (requestId <= 0) {
-            throw new WorkflowEsbException(Kind.VALIDATION, "requestId 必须是正整数");
+            throw new WorkflowEsbException(WorkflowErrors.REQUEST_ID_INVALID, "requestId 必须是正整数");
         }
         if (employee == null || employee.getEmployeeId() == null || employee.getEmployeeId() <= 0
                 || ColumnNameResolver.trimToNull(employee.getTenantKey()) == null) {
-            throw new WorkflowEsbException(Kind.VALIDATION, "缺少有效的操作用户或租户");
+            throw new WorkflowEsbException(WorkflowErrors.USER_CONTEXT_INVALID, "缺少有效的操作用户或租户");
         }
         if (requestRest == null || fieldRest == null || formTableService == null || formTableFieldService == null) {
-            throw new WorkflowEsbException(Kind.VALIDATION, "平台依赖未注入，请通过 Spring 获取本组件");
+            throw new WorkflowEsbException(WorkflowErrors.PLATFORM_UNAVAILABLE, "平台依赖未注入，请通过 Spring 获取本组件");
         }
     }
 
@@ -168,12 +168,12 @@ public class WorkflowFormQueryService {
      */
     private RequestFormInfoEntity relatedForm(List<RequestFormInfoEntity> forms) {
         if (forms == null || forms.size() != 1 || forms.get(0) == null) {
-            throw new WorkflowEsbException(Kind.NOT_FOUND, "流程必须且只能关联一张表单");
+            throw new WorkflowEsbException(WorkflowErrors.FORM_NOT_FOUND, "流程必须且只能关联一张表单");
         }
         RequestFormInfoEntity relation = forms.get(0);
         WfpRelateFormEntity form = relation.getRelateFormObj();
         if (form == null || form.getRelateKey() <= 0 || relation.getDataId() <= 0) {
-            throw new WorkflowEsbException(Kind.NOT_FOUND, "流程缺少有效的表单 ID 或表单数据 ID");
+            throw new WorkflowEsbException(WorkflowErrors.FORM_NOT_FOUND, "流程缺少有效的表单 ID 或表单数据 ID");
         }
         return relation;
     }
@@ -207,7 +207,7 @@ public class WorkflowFormQueryService {
                 names.put(id, name);
                 active.put(id, isActive);
             } else if (!previous.equals(name) && active.get(id) == isActive) {
-                throw new WorkflowEsbException(Kind.METADATA, "表单 " + id + " 对应多个物理表");
+                throw new WorkflowEsbException(WorkflowErrors.FIELD_METADATA_INVALID, "表单 " + id + " 对应多个物理表");
             }
         }
         return names;
@@ -331,7 +331,7 @@ public class WorkflowFormQueryService {
             FormTableField physical = meta.fields.get(field.getId());
             String column = ColumnNameResolver.resolve(field, physical);
             if (column == null) {
-                throw new WorkflowEsbException(Kind.METADATA,
+                throw new WorkflowEsbException(WorkflowErrors.FIELD_METADATA_INVALID,
                         "字段 " + field.getId() + " 有数据但平台未返回数据库列名");
             }
             Object[] cell = valueOf(detail);
@@ -343,11 +343,11 @@ public class WorkflowFormQueryService {
             }
             String table = detailTableName(subForm, physical, meta);
             if (table == null) {
-                throw new WorkflowEsbException(Kind.METADATA, "明细表 " + subForm.getId() + " 未返回数据库表名");
+                throw new WorkflowEsbException(WorkflowErrors.FIELD_METADATA_INVALID, "明细表 " + subForm.getId() + " 未返回数据库表名");
             }
             Long rowIndex = detail.getDataIndex();
             if (rowIndex == null || rowIndex < 0) {
-                throw new WorkflowEsbException(Kind.METADATA, "明细表 " + table + " 的数据缺少有效行下标");
+                throw new WorkflowEsbException(WorkflowErrors.FIELD_METADATA_INVALID, "明细表 " + table + " 的数据缺少有效行下标");
             }
             Map<String, Object> row = row(rowsByTable, table, rowIndex);
             Map<String, Object> textRow = row(textRowsByTable, table, rowIndex);
@@ -475,7 +475,7 @@ public class WorkflowFormQueryService {
      */
     private void putUnique(Map<String, Object> row, String column, Object value, String table) {
         if (row.containsKey(column)) {
-            throw new WorkflowEsbException(Kind.METADATA, table + " 同一行出现重复数据库列：" + column);
+            throw new WorkflowEsbException(WorkflowErrors.FIELD_METADATA_INVALID, table + " 同一行出现重复数据库列：" + column);
         }
         row.put(column, value);
     }
@@ -492,7 +492,7 @@ public class WorkflowFormQueryService {
         if (previous == null) {
             row.put(WorkflowEsbForm.ID_KEY, rowId);
         } else if (!previous.equals(rowId)) {
-            throw new WorkflowEsbException(Kind.METADATA, table + " 同一行返回了不一致的行 ID");
+            throw new WorkflowEsbException(WorkflowErrors.FIELD_METADATA_INVALID, table + " 同一行返回了不一致的行 ID");
         }
     }
 
@@ -536,7 +536,7 @@ public class WorkflowFormQueryService {
      */
     private String checkedTable(String name) {
         if (name != null && !ColumnNameResolver.isSafeIdentifier(name)) {
-            throw new WorkflowEsbException(Kind.METADATA, "平台返回的数据库表名格式无效");
+            throw new WorkflowEsbException(WorkflowErrors.FIELD_METADATA_INVALID, "平台返回的数据库表名格式无效");
         }
         return name;
     }

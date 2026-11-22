@@ -1,5 +1,6 @@
 package com.weaver.seconddev.solelyr.workflow.util;
 
+import com.weaver.seconddev.solelyr.workflow.exception.WorkflowErrors;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONException;
 import com.alibaba.fastjson2.JSONObject;
@@ -98,7 +99,7 @@ public final class ColumnNameResolver {
      */
     private static String checked(String name, FormField field) {
         if (!isSafeIdentifier(name)) {
-            throw new WorkflowEsbException(WorkflowEsbException.Kind.METADATA,
+            throw new WorkflowEsbException(WorkflowErrors.FIELD_METADATA_INVALID,
                     "字段 " + field.getId() + " 返回的数据库列名格式无效");
         }
         return name;

@@ -1,19 +1,17 @@
 package com.weaver.seconddev.solelyr.workflow.action;
 
+import com.weaver.seconddev.solelyr.workflow.exception.WorkflowErrors;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
 import com.weaver.common.base.entity.result.WeaResult;
-import com.weaver.common.base.enumeration.result.WeaResultCodeEnum;
 import com.weaver.esb.api.rpc.EsbServerlessRpcRemoteInterface;
 import com.weaver.framework.rpc.context.impl.TenantRpcContext;
 import com.weaver.seconddev.solelyr.workflow.exception.WorkflowEsbException;
+import com.weaver.seconddev.solelyr.workflow.exception.WorkflowEsbExceptionHandler;
 import com.weaver.seconddev.solelyr.workflow.model.WorkflowEsbForm;
 import com.weaver.seconddev.solelyr.workflow.service.WorkflowFormQueryService;
 import java.util.LinkedHashMap;
 import java.util.Map;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 /**
@@ -23,7 +21,6 @@ import org.springframework.stereotype.Service;
  */
 @Service("solelyrWorkflowEsbAction")
 public class WorkflowEsbAction implements EsbServerlessRpcRemoteInterface {
-    private static final Logger LOG = LoggerFactory.getLogger(WorkflowEsbAction.class);
     private final WorkflowFormQueryService service;
     private final Map<String, WorkflowEsbActionHandler<?>> handlers;
 
@@ -50,16 +47,9 @@ public class WorkflowEsbAction implements EsbServerlessRpcRemoteInterface {
                 return WeaResult.success(result.toMap());
             }
             return WeaResult.success(toResponseMap(handler.execute(result)));
-        } catch (WorkflowEsbException e) {
-            if (e.getCause() == null) {
-                LOG.warn("Workflow ESB action rejected; kind={}", e.getKind());
-            } else {
-                LOG.warn("Workflow ESB action failed; kind={}", e.getKind(), e);
-            }
-            return WeaResult.fail(WeaResultCodeEnum.ERROR.getCode(), e.getMessage(), true);
-        } catch (RuntimeException e) {
-            LOG.error("Workflow ESB action failed; exceptionType={}", e.getClass().getSimpleName(), e);
-            return WeaResult.fail(WeaResultCodeEnum.ERROR.getCode(), "工作流 ESB 执行失败，请核对服务端日志", true);
+        } catch (RuntimeException failure) {
+            return WorkflowEsbExceptionHandler.failureResponse("Workflow ESB action failed", failure,
+                    "工作流 ESB 执行失败，请核对服务端日志");
         }
     }
 
@@ -71,7 +61,7 @@ public class WorkflowEsbAction implements EsbServerlessRpcRemoteInterface {
         if (json instanceof JSONObject) {
             return (JSONObject) json;
         }
-        throw new WorkflowEsbException(WorkflowEsbException.Kind.VALIDATION,
+        throw new WorkflowEsbException(WorkflowErrors.RESULT_INVALID,
                 "execute 的返回值必须能转换为 JSON 对象");
     }
 
@@ -80,12 +70,12 @@ public class WorkflowEsbAction implements EsbServerlessRpcRemoteInterface {
             return null;
         }
         if (!(serviceName instanceof String) || ((String) serviceName).trim().isEmpty()) {
-            throw new WorkflowEsbException(WorkflowEsbException.Kind.VALIDATION,
+            throw new WorkflowEsbException(WorkflowErrors.HANDLER_INVALID,
                     "serviceName 必须是非空字符串");
         }
         WorkflowEsbActionHandler<?> handler = handlers.get(((String) serviceName).trim());
         if (handler == null) {
-            throw new WorkflowEsbException(WorkflowEsbException.Kind.VALIDATION,
+            throw new WorkflowEsbException(WorkflowErrors.HANDLER_INVALID,
                     "serviceName 对应的表单处理策略不存在");
         }
         return handler;
@@ -121,16 +111,16 @@ public class WorkflowEsbAction implements EsbServerlessRpcRemoteInterface {
             value = params.get("requestid");
         }
         if (!(value instanceof String) && !(value instanceof Number)) {
-            throw new WorkflowEsbException(WorkflowEsbException.Kind.VALIDATION, "动作参数缺少 requestId");
+            throw new WorkflowEsbException(WorkflowErrors.REQUEST_ID_INVALID, "动作参数缺少 requestId");
         }
         String text = String.valueOf(value).trim();
         if (!text.matches("[1-9][0-9]{0,18}")) {
-            throw new WorkflowEsbException(WorkflowEsbException.Kind.VALIDATION, "requestId 必须是正整数");
+            throw new WorkflowEsbException(WorkflowErrors.REQUEST_ID_INVALID, "requestId 必须是正整数");
         }
         try {
             return Long.parseLong(text);
         } catch (NumberFormatException e) {
-            throw new WorkflowEsbException(WorkflowEsbException.Kind.VALIDATION, "requestId 超出范围");
+            throw new WorkflowEsbException(WorkflowErrors.REQUEST_ID_INVALID, "requestId 超出范围", e);
         }
     }
 }

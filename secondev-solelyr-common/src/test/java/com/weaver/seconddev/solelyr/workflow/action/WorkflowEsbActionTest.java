@@ -5,6 +5,7 @@ import static com.weaver.seconddev.solelyr.workflow.TestSupport.eq;
 
 import com.weaver.common.base.entity.result.WeaResult;
 import com.weaver.seconddev.solelyr.workflow.TestSupport;
+import com.weaver.seconddev.solelyr.workflow.exception.WorkflowErrors;
 import com.weaver.seconddev.solelyr.workflow.exception.WorkflowEsbException;
 import com.weaver.seconddev.solelyr.workflow.model.WorkflowEsbForm;
 import com.weaver.seconddev.solelyr.workflow.service.WorkflowFormQueryService;
@@ -53,7 +54,7 @@ public final class WorkflowEsbActionTest {
         });
         check("服务异常转换为 WeaResult 失败", () -> {
             WeaResult<Map<String, Object>> r = action(new StubService(new WorkflowEsbException(
-                    WorkflowEsbException.Kind.NOT_FOUND, "未找到流程实例：101"))).execute(params("requestId", "101"));
+                    WorkflowErrors.REQUEST_NOT_FOUND, "未找到流程实例：101"))).execute(params("requestId", "101"));
             eq(false, r.isStatus());
             eq("未找到流程实例：101", r.getMsg());
             WeaResult<Map<String, Object>> unknown = action(new StubService(new IllegalStateException("x")))
@@ -88,7 +89,7 @@ public final class WorkflowEsbActionTest {
             factory.registerSingleton("listAction", (WorkflowEsbActionHandler<Object>)
                     result -> Collections.singletonList(result.getRequestId()));
             factory.registerSingleton("failedAction", (WorkflowEsbActionHandler<Object>) result -> {
-                throw new WorkflowEsbException("供应商接口调用失败", new IllegalStateException("内部错误"));
+                throw new WorkflowEsbException(() -> "SUPPLIER.PUSH_FAILED", "供应商接口调用失败", new IllegalStateException("内部错误"));
             });
             factory.registerBeanDefinition("workflowEsbAction", new RootBeanDefinition(TestAction.class));
             WorkflowEsbAction entry = factory.getBean("workflowEsbAction", WorkflowEsbAction.class);

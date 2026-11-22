@@ -1,5 +1,6 @@
 package com.weaver.seconddev.solelyr.workflow.controller;
 
+import com.weaver.seconddev.solelyr.workflow.exception.WorkflowErrors;
 import com.weaver.common.authority.annotation.WeaPermission;
 import com.weaver.common.base.entity.result.WeaResult;
 import com.weaver.common.base.enumeration.result.WeaResultCodeEnum;
@@ -49,20 +50,20 @@ public class WorkflowEsbController {
 
     private WorkflowEsbForm query(String requestId) {
         if (requestId == null || !requestId.trim().matches("[1-9][0-9]{0,18}")) {
-            throw new WorkflowEsbException(WorkflowEsbException.Kind.VALIDATION, "requestid 必须是正整数");
+            throw new WorkflowEsbException(WorkflowErrors.REQUEST_ID_INVALID, "requestid 必须是正整数");
         }
         long id;
         try {
             id = Long.parseLong(requestId.trim());
         } catch (NumberFormatException e) {
-            throw new WorkflowEsbException(WorkflowEsbException.Kind.VALIDATION, "requestid 超出范围");
+            throw new WorkflowEsbException(WorkflowErrors.REQUEST_ID_INVALID, "requestid 超出范围", e);
         }
         return service.query(id, TenantRpcContext.getEmployeeIdLong(), TenantRpcContext.getCurrentTenantKey());
     }
 
     private WorkflowEsbFormMapper<?> resolveMapper(String mapperName) {
         if (mapperName == null || mapperName.trim().isEmpty()) {
-            throw new WorkflowEsbException(WorkflowEsbException.Kind.VALIDATION, "mapper 不能为空");
+            throw new WorkflowEsbException(WorkflowErrors.MAPPER_INVALID, "mapper 不能为空");
         }
         String name = mapperName.trim();
         WorkflowEsbFormMapper<?> match = mappers.get(name);
@@ -73,14 +74,14 @@ public class WorkflowEsbController {
             Class<?> type = AopUtils.getTargetClass(mapper);
             if (name.equals(type.getName()) || name.equals(type.getSimpleName())) {
                 if (match != null) {
-                    throw new WorkflowEsbException(WorkflowEsbException.Kind.VALIDATION,
+                    throw new WorkflowEsbException(WorkflowErrors.MAPPER_INVALID,
                             "mapper 对应多个 Bean，请使用 Spring Bean 名称");
                 }
                 match = mapper;
             }
         }
         if (match == null) {
-            throw new WorkflowEsbException(WorkflowEsbException.Kind.NOT_FOUND, "mapper 对应的映射器不存在");
+            throw new WorkflowEsbException(WorkflowErrors.MAPPER_NOT_FOUND, "mapper 对应的映射器不存在");
         }
         return match;
     }
@@ -88,14 +89,12 @@ public class WorkflowEsbController {
     private <T> WeaResult<T> respond(Supplier<T> operation) {
         try {
             return WeaResult.success(operation.get());
-        } catch (WorkflowEsbException e) {
-            if (e.getCause() != null) {
-                LOG.warn("Workflow ESB request failed; kind={}", e.getKind(), e);
-            }
-            return WeaResult.fail(WeaResultCodeEnum.ERROR.getCode(), e.getMessage(), true);
-        } catch (RuntimeException e) {
-            LOG.error("Workflow ESB request failed", e);
-            return WeaResult.fail(WeaResultCodeEnum.ERROR.getCode(), "工作流 ESB 执行失败，请核对服务端日志", true);
+        } catch (WorkflowEsbException failure) {
+            throw failure;
+        } catch (RuntimeException failure) {
+            LOG.error("Workflow ESB request failed", failure);
+            return WeaResult.fail(WeaResultCodeEnum.ERROR.getCode(),
+                    "工作流 ESB 执行失败，请核对服务端日志", true);
         }
     }
 }

@@ -1,54 +1,45 @@
 package com.weaver.seconddev.solelyr.workflow.exception;
 
+import java.util.Objects;
 
 /**
  * @USER: solelyr
  * @DATE: 2026/11/11 15:10
- * @DESCRIPTION: 工作流 ESB 入口的统一异常，适用于表单查询和自定义策略执行
+ * @DESCRIPTION: 携带模块错误码、业务说明和原始原因
  */
 public class WorkflowEsbException extends RuntimeException {
     private static final long serialVersionUID = 1L;
+    private static final String DEFAULT_MESSAGE = "工作流 ESB 执行失败，请核对服务端日志";
 
-    /** 异常类别。 */
-    public enum Kind {
-        /** 调用参数或用户上下文无效。 */
-        VALIDATION,
-        /** 执行所需的业务数据不存在。 */
-        NOT_FOUND,
-        /** 字段定义缺少数据库列名、表名或存在重复列。 */
-        METADATA,
-        /** 自定义策略或其调用的接口执行失败。 */
-        EXECUTION
+    private final String errorCode;
+
+    public WorkflowEsbException(WorkflowErrorCode code, String message) {
+        this(code, message, null);
     }
 
-    private final Kind kind;
-
-    /**
-     * 创建 ESB 异常。
-     *
-     * @param kind 异常类别
-     * @param message 可直接返回给调用方的说明，不含业务数据
-     */
-    public WorkflowEsbException(Kind kind, String message) {
-        this(kind, message, null);
+    public WorkflowEsbException(WorkflowErrorCode code, String message, Throwable cause) {
+        this(Objects.requireNonNull(code, "code").code(), message, cause);
     }
 
-    /** 创建自定义策略执行异常，message 用于响应，cause 用于服务端日志。 */
-    public WorkflowEsbException(String message, Throwable cause) {
-        this(Kind.EXECUTION, message, cause);
+    private WorkflowEsbException(String errorCode, String message, Throwable cause) {
+        super(message == null || message.trim().isEmpty() ? DEFAULT_MESSAGE : message, cause);
+        if (errorCode == null || errorCode.trim().isEmpty()) {
+            throw new IllegalArgumentException("工作流错误码不能为空");
+        }
+        this.errorCode = errorCode;
     }
 
-    public WorkflowEsbException(Kind kind, String message, Throwable cause) {
-        super(message, cause);
-        this.kind = kind;
+    public String getErrorCode() {
+        return errorCode;
     }
 
-    /**
-     * 获取异常类别。
-     *
-     * @return 异常类别
-     */
-    public Kind getKind() {
-        return kind;
+    /** 补充调用位置的业务信息，保留原错误码和异常链。 */
+    public WorkflowEsbException withContext(String message) {
+        return new WorkflowEsbException(errorCode, message, this);
+    }
+
+    @Override
+    public String toString() {
+        return super.toString() + " [errorCode=" + errorCode + "]";
     }
 }

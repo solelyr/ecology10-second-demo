@@ -180,7 +180,8 @@ tasks.register('explodeWar') {
 }
 
 // Claude 通用流程表单查询组件：离线 RPC 替身测试，不访问真实环境。
-['ColumnNameResolverTest': 'com.weaver.seconddev.solelyr.workflow.util.ColumnNameResolverTest',
+['WorkflowEsbExceptionTest': 'com.weaver.seconddev.solelyr.workflow.exception.WorkflowEsbExceptionTest',
+ 'ColumnNameResolverTest': 'com.weaver.seconddev.solelyr.workflow.util.ColumnNameResolverTest',
  'WorkflowFormQueryServiceTest': 'com.weaver.seconddev.solelyr.workflow.service.WorkflowFormQueryServiceTest',
  'WorkflowEsbActionTest': 'com.weaver.seconddev.solelyr.workflow.action.WorkflowEsbActionTest'].each { name, cls ->
     tasks.register("solelyr${name}", JavaExec) {
@@ -196,5 +197,5 @@ tasks.register('explodeWar') {
 tasks.register('solelyrWorkflowFormTest') {
     group = 'verification'
     description = '运行 com.weaver.seconddev.solelyr 全部离线测试'
-    dependsOn 'solelyrColumnNameResolverTest', 'solelyrWorkflowFormQueryServiceTest', 'solelyrWorkflowEsbActionTest'
+    dependsOn 'solelyrColumnNameResolverTest', 'solelyrWorkflowFormQueryServiceTest', 'solelyrWorkflowEsbActionTest', 'solelyrWorkflowEsbExceptionTest'
 }

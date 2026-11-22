@@ -9,6 +9,7 @@ import com.weaver.common.form.physical.entity.FormTable;
 import com.weaver.common.form.physical.entity.FormTableField;
 import com.weaver.common.form.physical.service.FormTableFieldService;
 import com.weaver.common.form.physical.service.FormTableService;
+import com.weaver.seconddev.solelyr.workflow.exception.WorkflowErrorCode;
 import com.weaver.seconddev.solelyr.workflow.exception.WorkflowEsbException;
 import com.weaver.teams.domain.user.SimpleEmployee;
 import com.weaver.workflow.common.entity.formdef.RequestFormInfoEntity;
@@ -78,20 +79,20 @@ public final class TestSupport {
     }
 
     /**
-     * 断言抛出指定类别的查询异常。
+     * 断言抛出指定错误码的查询异常。
      *
-     * @param kind 期望类别
+     * @param code 期望错误码
      * @param body 测试体
      * @throws Exception 测试体抛出的非查询异常
      */
-    public static void expect(com.weaver.seconddev.solelyr.workflow.exception.WorkflowEsbException.Kind kind, Body body) throws Exception {
+    public static void expect(WorkflowErrorCode code, Body body) throws Exception {
         try {
             body.run();
         } catch (WorkflowEsbException e) {
-            eq(kind, e.getKind());
+            eq(code.code(), e.getErrorCode());
             return;
         }
-        throw new AssertionError("expected WorkflowEsbException " + kind);
+        throw new AssertionError("expected WorkflowEsbException " + code.code());
     }
 
     /**

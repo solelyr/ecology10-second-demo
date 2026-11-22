@@ -19,7 +19,6 @@ import java.util.*;
  * @USER: solelyr
  * @DATE: 2026/9/23 20:02
  * @DESCRIPTION: 通过 E10 数据源执行 SQL 查询、更新和事务操作
- * @Description:
  * 基于 E10 {@link DataSetService} 的通用 SQL 执行器。
  *
  * <p>SQL 使用 {@code ?} 作为占位符，参数通过 {@link SqlParamEntity} 交给平台底层

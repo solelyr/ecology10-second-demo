@@ -2,7 +2,7 @@ package com.weaver.seconddev.solelyr.workflow.util;
 
 import com.weaver.common.form.metadata.field.FormField;
 import com.weaver.seconddev.solelyr.workflow.TestSupport;
-import com.weaver.seconddev.solelyr.workflow.exception.WorkflowEsbException;
+import com.weaver.seconddev.solelyr.workflow.exception.WorkflowErrors;
 
 /**
  * @USER: solelyr
@@ -43,7 +43,7 @@ public final class ColumnNameResolverTest {
             TestSupport.eq("from_field", ColumnNameResolver.resolve(f, TestSupport.column(5, null, "t")));
         });
         TestSupport.check("null 字段返回 null", () -> TestSupport.eq(null, ColumnNameResolver.resolve(null)));
-        TestSupport.check("非法列名被拒绝", () -> TestSupport.expect(WorkflowEsbException.Kind.METADATA,
+        TestSupport.check("非法列名被拒绝", () -> TestSupport.expect(WorkflowErrors.FIELD_METADATA_INVALID,
                 () -> ColumnNameResolver.resolve(TestSupport.mainField(4, "x", "a;drop table"))));
         TestSupport.check("isSafeIdentifier 边界", () -> {
             TestSupport.eq(true, ColumnNameResolver.isSafeIdentifier("uf_gys_mx1"));

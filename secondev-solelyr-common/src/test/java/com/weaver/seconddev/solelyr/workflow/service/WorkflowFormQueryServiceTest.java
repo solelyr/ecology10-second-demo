@@ -10,7 +10,7 @@ import com.weaver.common.form.metadata.subform.SubForm;
 import com.weaver.common.form.physical.entity.FormTable;
 import com.weaver.common.form.physical.entity.FormTableField;
 import com.weaver.seconddev.solelyr.workflow.TestSupport;
-import com.weaver.seconddev.solelyr.workflow.exception.WorkflowEsbException;
+import com.weaver.seconddev.solelyr.workflow.exception.WorkflowErrors;
 import com.weaver.seconddev.solelyr.workflow.model.WorkflowFieldInfo;
 import com.weaver.seconddev.solelyr.workflow.model.WorkflowEsbForm;
 import com.weaver.teams.domain.user.SimpleEmployee;
@@ -111,57 +111,57 @@ public final class WorkflowFormQueryServiceTest {
             TestSupport.eq("9001", m.get("dataId"));
             TestSupport.eq(true, m.get("mainData") instanceof Map);
         });
-        TestSupport.check("requestId 非法", () -> TestSupport.expect(WorkflowEsbException.Kind.VALIDATION,
+        TestSupport.check("requestId 非法", () -> TestSupport.expect(WorkflowErrors.REQUEST_ID_INVALID,
                 () -> service(fields(), TestSupport.formData("uf_test")).query(0L, TestSupport.employee())));
         TestSupport.check("用户上下文缺失", () -> {
             SimpleEmployee noTenant = new SimpleEmployee(1L);
-            TestSupport.expect(WorkflowEsbException.Kind.VALIDATION, () -> service(fields(), TestSupport.formData("t")).query(1L, noTenant));
-            TestSupport.expect(WorkflowEsbException.Kind.VALIDATION, () -> service(fields(), TestSupport.formData("t")).query(1L, (SimpleEmployee) null));
-            TestSupport.expect(WorkflowEsbException.Kind.VALIDATION, () -> service(fields(), TestSupport.formData("t")).query(1L, null, "t1"));
-            TestSupport.expect(WorkflowEsbException.Kind.VALIDATION, () -> service(fields(), TestSupport.formData("t")).query(1L, 1L, " "));
+            TestSupport.expect(WorkflowErrors.USER_CONTEXT_INVALID, () -> service(fields(), TestSupport.formData("t")).query(1L, noTenant));
+            TestSupport.expect(WorkflowErrors.USER_CONTEXT_INVALID, () -> service(fields(), TestSupport.formData("t")).query(1L, (SimpleEmployee) null));
+            TestSupport.expect(WorkflowErrors.USER_CONTEXT_INVALID, () -> service(fields(), TestSupport.formData("t")).query(1L, null, "t1"));
+            TestSupport.expect(WorkflowErrors.USER_CONTEXT_INVALID, () -> service(fields(), TestSupport.formData("t")).query(1L, 1L, " "));
         });
         TestSupport.check("平台依赖未注入时给出明确错误", () -> {
-            TestSupport.expect(WorkflowEsbException.Kind.VALIDATION, () -> new WorkflowFormQueryService().query(1L, TestSupport.employee()));
-            TestSupport.expect(WorkflowEsbException.Kind.VALIDATION, () -> new WorkflowFormQueryService(TestSupport.requestRest(null),
+            TestSupport.expect(WorkflowErrors.PLATFORM_UNAVAILABLE, () -> new WorkflowFormQueryService().query(1L, TestSupport.employee()));
+            TestSupport.expect(WorkflowErrors.PLATFORM_UNAVAILABLE, () -> new WorkflowFormQueryService(TestSupport.requestRest(null),
                     TestSupport.fieldRest(fields(), TestSupport.formData("t")), null, TestSupport.columnService(null)).query(1L, TestSupport.employee()));
         });
         TestSupport.check("流程实例不存在或 ID 不一致", () -> {
-            TestSupport.expect(WorkflowEsbException.Kind.NOT_FOUND, () -> new WorkflowFormQueryService(TestSupport.requestRest(null),
+            TestSupport.expect(WorkflowErrors.REQUEST_NOT_FOUND, () -> new WorkflowFormQueryService(TestSupport.requestRest(null),
                     TestSupport.fieldRest(fields(), TestSupport.formData("t")), TestSupport.tableService(null), TestSupport.columnService(null)).query(101L, TestSupport.employee()));
-            TestSupport.expect(WorkflowEsbException.Kind.NOT_FOUND, () -> new WorkflowFormQueryService(TestSupport.requestRest(TestSupport.request(102L, 77L, 300L, 9001L)),
+            TestSupport.expect(WorkflowErrors.REQUEST_NOT_FOUND, () -> new WorkflowFormQueryService(TestSupport.requestRest(TestSupport.request(102L, 77L, 300L, 9001L)),
                     TestSupport.fieldRest(fields(), TestSupport.formData("t")), TestSupport.tableService(null), TestSupport.columnService(null)).query(101L, TestSupport.employee()));
         });
         TestSupport.check("流程未关联或关联多张表单", () -> {
             WfcRequestRpcEntity none = TestSupport.request(101L, 77L, 300L, 9001L);
             none.setFormInfos(Collections.emptyList());
-            TestSupport.expect(WorkflowEsbException.Kind.NOT_FOUND, () -> new WorkflowFormQueryService(TestSupport.requestRest(none),
+            TestSupport.expect(WorkflowErrors.FORM_NOT_FOUND, () -> new WorkflowFormQueryService(TestSupport.requestRest(none),
                     TestSupport.fieldRest(fields(), TestSupport.formData("t")), TestSupport.tableService(null), TestSupport.columnService(null)).query(101L, TestSupport.employee()));
             WfcRequestRpcEntity two = TestSupport.request(101L, 77L, 300L, 9001L);
             two.setFormInfos(Arrays.asList(two.getFormInfos().get(0), two.getFormInfos().get(0)));
-            TestSupport.expect(WorkflowEsbException.Kind.NOT_FOUND, () -> new WorkflowFormQueryService(TestSupport.requestRest(two),
+            TestSupport.expect(WorkflowErrors.FORM_NOT_FOUND, () -> new WorkflowFormQueryService(TestSupport.requestRest(two),
                     TestSupport.fieldRest(fields(), TestSupport.formData("t")), TestSupport.tableService(null), TestSupport.columnService(null)).query(101L, TestSupport.employee()));
         });
         TestSupport.check("字段定义为空或表单数据为空", () -> {
-            TestSupport.expect(WorkflowEsbException.Kind.METADATA, () -> service(new ArrayList<FormField>(), TestSupport.formData("t")).query(101L, TestSupport.employee()));
-            TestSupport.expect(WorkflowEsbException.Kind.NOT_FOUND, () -> service(fields(), null).query(101L, TestSupport.employee()));
+            TestSupport.expect(WorkflowErrors.FIELD_METADATA_INVALID, () -> service(new ArrayList<FormField>(), TestSupport.formData("t")).query(101L, TestSupport.employee()));
+            TestSupport.expect(WorkflowErrors.FORM_NOT_FOUND, () -> service(fields(), null).query(101L, TestSupport.employee()));
         });
-        TestSupport.check("有数据但缺少数据库列名时阻断，不回退 dataKey", () -> TestSupport.expect(WorkflowEsbException.Kind.METADATA,
+        TestSupport.check("有数据但缺少数据库列名时阻断，不回退 dataKey", () -> TestSupport.expect(WorkflowErrors.FIELD_METADATA_INVALID,
                 () -> service(fields(), TestSupport.formData("uf_test", TestSupport.cell(LAYOUT, "x", null, null))).query(101L, TestSupport.employee())));
         TestSupport.check("同一行重复列阻断", () -> {
             FormField dup = TestSupport.mainField(4, "other", "gysbm");
             List<FormField> list = new ArrayList<>(fields());
             list.add(dup);
-            TestSupport.expect(WorkflowEsbException.Kind.METADATA, () -> service(list, TestSupport.formData("uf_test",
+            TestSupport.expect(WorkflowErrors.FIELD_METADATA_INVALID, () -> service(list, TestSupport.formData("uf_test",
                     TestSupport.cell(CODE, "1", null, null), TestSupport.cell(dup, "2", null, null))).query(101L, TestSupport.employee()));
         });
         TestSupport.check("明细缺表名或行下标阻断", () -> {
             FormField noTable = TestSupport.detailField(21, "a", "a", TestSupport.subForm(600L, "mx2", null));
-            TestSupport.expect(WorkflowEsbException.Kind.METADATA, () -> service(Collections.singletonList(noTable),
+            TestSupport.expect(WorkflowErrors.FIELD_METADATA_INVALID, () -> service(Collections.singletonList(noTable),
                     TestSupport.formData("t", TestSupport.cell(noTable, "1", 0L, null))).query(101L, TestSupport.employee()));
-            TestSupport.expect(WorkflowEsbException.Kind.METADATA, () -> service(fields(),
+            TestSupport.expect(WorkflowErrors.FIELD_METADATA_INVALID, () -> service(fields(),
                     TestSupport.formData("t", TestSupport.cell(ITEM, "1", null, null))).query(101L, TestSupport.employee()));
         });
-        TestSupport.check("同一明细行的行 ID 不一致时阻断", () -> TestSupport.expect(WorkflowEsbException.Kind.METADATA, () -> service(fields(),
+        TestSupport.check("同一明细行的行 ID 不一致时阻断", () -> TestSupport.expect(WorkflowErrors.FIELD_METADATA_INVALID, () -> service(fields(),
                 TestSupport.formData("t", TestSupport.cell(ITEM, "1", 0L, 1L), TestSupport.cell(QTY, "2", 0L, 2L))).query(101L, TestSupport.employee())));
         TestSupport.check("运行时 SubForm 只有 id：按 form_table 解析主表和明细表名", () -> {
             SubForm idOnly = new SubForm();
@@ -214,7 +214,7 @@ public final class WorkflowFormQueryServiceTest {
             TestSupport.eq(0, r.getDetailRows("uf_empty_dt").size());
         });
         TestSupport.check("同一表单多张有效物理表阻断，已删除记录让位于有效记录", () -> {
-            TestSupport.expect(WorkflowEsbException.Kind.METADATA, () -> service(fields(), TestSupport.formData("t"),
+            TestSupport.expect(WorkflowErrors.FIELD_METADATA_INVALID, () -> service(fields(), TestSupport.formData("t"),
                     Arrays.asList(TestSupport.table(300L, "uf_a", 0), TestSupport.table(300L, "uf_b", 0)), new ArrayList<FormTableField>())
                     .query(101L, TestSupport.employee()));
             com.weaver.seconddev.solelyr.workflow.model.WorkflowEsbForm r = service(fields(), TestSupport.formData("t"),
@@ -286,7 +286,7 @@ public final class WorkflowFormQueryServiceTest {
             TestSupport.eq(true, r.toMap().get("mainText") instanceof Map);
             TestSupport.eq(true, r.toMap().get("detailText") instanceof Map);
         });
-        TestSupport.check("非法表名被拒绝", () -> TestSupport.expect(WorkflowEsbException.Kind.METADATA,
+        TestSupport.check("非法表名被拒绝", () -> TestSupport.expect(WorkflowErrors.FIELD_METADATA_INVALID,
                 () -> service(fields(), TestSupport.formData("bad-name")).query(101L, TestSupport.employee())));
         TestSupport.finish("WorkflowFormQueryServiceTest");
     }
