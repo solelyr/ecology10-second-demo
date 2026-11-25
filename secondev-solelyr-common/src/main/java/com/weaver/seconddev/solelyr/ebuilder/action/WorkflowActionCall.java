@@ -15,7 +15,6 @@ import com.weaver.publishkit.api.util.PublishKitRuntimeUtil;
 import com.weaver.seconddev.solelyr.workflow.action.WorkflowEsbActionHandler;
 import com.weaver.seconddev.solelyr.workflow.exception.WorkflowErrors;
 import com.weaver.seconddev.solelyr.workflow.exception.WorkflowEsbException;
-import com.weaver.seconddev.solelyr.workflow.exception.WorkflowEsbExceptionHandler;
 import com.weaver.seconddev.solelyr.workflow.model.WorkflowEsbForm;
 import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.CloseableHttpResponse;
@@ -89,16 +88,13 @@ public class WorkflowActionCall implements EsbServerlessRpcRemoteInterface {
             requestParams.put("serviceName", name);
             form.setParams(requestParams);
             Object result = handler.execute(form);
-            EBDataChangeResult changeResult = update(appId,JSON.toJSONString(result),formId,dataId,Util.null2String(employeeId),tenantKey);
+            update(appId, JSON.toJSONString(result), formId, dataId, Util.null2String(employeeId), tenantKey);
             return WeaResult.success();
         } catch (RuntimeException failure) {
+            LOG.error("Workflow action call failed: requestId={}, serviceName={}, dataId={}", requestId, name, dataId, failure);
             recordFailure(failure, appId, formId, dataId, Util.null2String(employeeId), tenantKey);
-            if (failure instanceof WorkflowEsbException) {
-                return WorkflowEsbExceptionHandler.failureResponse("Workflow action call failed", (WorkflowEsbException) failure);
-            }
-            LOG.error("Workflow action call failed", failure);
             return WeaResult.fail(WeaResultCodeEnum.ERROR.getCode(),
-                    "U8 工作流动作执行失败，请核对服务端日志", true);
+                    failure.getMessage(), true);
         }
     }
 
@@ -119,6 +115,7 @@ public class WorkflowActionCall implements EsbServerlessRpcRemoteInterface {
         } catch (RuntimeException writeFailure) {
             if (writeFailure != failure) {
                 failure.addSuppressed(writeFailure);
+                LOG.error("Workflow action result write failed: formId={}, dataId={}", formId, dataId, writeFailure);
             }
         }
     }
@@ -184,7 +181,7 @@ public class WorkflowActionCall implements EsbServerlessRpcRemoteInterface {
 
     @Autowired
     private PublishKitRuntimeUtil publishKitRuntimeUtil;
-    private EBDataChangeResult update(String appId, String result, String formId, String dataId, String userId, String tenantKey) {
+    private void update(String appId, String result, String formId, String dataId, String userId, String tenantKey) {
         RemoteSimpleDataService remoteSimpleDataService = publishKitRuntimeUtil.buildRpcService(RemoteSimpleDataService.class, "ebuilderform", appId);
 
         /**
@@ -213,7 +210,10 @@ public class WorkflowActionCall implements EsbServerlessRpcRemoteInterface {
         datas.add(ebDataReqDto1);
 
         ebDataChangeReqDto.setDatas(datas);
-        return remoteSimpleDataService.updateFormData(ebDataChangeReqDto);
+        EBDataChangeResult written = remoteSimpleDataService.updateFormData(ebDataChangeReqDto);
+        if (written == null || !Boolean.TRUE.equals(written.getStatus())) {
+            throw new WorkflowEsbException(WorkflowErrors.RESULT_INVALID, "OA 测试表单结果回写未获确认");
+        }
 
     }
 

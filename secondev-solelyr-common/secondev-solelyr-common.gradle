@@ -17,7 +17,7 @@ description = "solelyr 二开模块"
 // 因此只能通过这两项改名，不要再设置 archiveFileName、archiveClassifier 或 archiveAppendix。
 // 注意：-P 参数对本次构建的所有模块生效，同时构建多个模块时请改用下方默认值。
 def defaultJarName = project.name
-def defaultJarVersion = '261101-1.0.0-SNAPSHOT'
+def defaultJarVersion = '261101-1.1.4-SNAPSHOT'
 
 def customJarName = (findProperty('jarName') ?: defaultJarName).toString().trim()
 def customJarVersion = (findProperty('jarVersion') ?: defaultJarVersion).toString().trim()
