@@ -18,6 +18,7 @@ import com.weaver.workflow.common.entity.rpc.WfcRequestRpcEntity;
 import com.weaver.workflow.core.api.rest.publicapi.WfcFormFieldRest;
 import com.weaver.workflow.core.api.rest.publicapi.WfcGetRequestDataRest;
 import java.lang.reflect.Proxy;
+import com.weaver.file.ud.api.FileDownloadService;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -311,6 +312,18 @@ public final class TestSupport {
                 new Class<?>[]{FormTableService.class}, (proxy, method, args) -> {
                     if ("listFormTableByMainFormId".equals(method.getName())) {
                         return tables;
+                    }
+                    throw new UnsupportedOperationException(method.getName());
+                });
+    }
+
+    /** 文件服务替身，验证租户并将调用参数编码为可断言的链接。 */
+    public static FileDownloadService fileDownloadService() {
+        return (FileDownloadService) Proxy.newProxyInstance(TestSupport.class.getClassLoader(),
+                new Class<?>[]{FileDownloadService.class}, (proxy, method, args) -> {
+                    if ("getDownloadUrl".equals(method.getName())) {
+                        eq("t1", args[1]);
+                        return "/download/" + args[0] + "/" + args[2];
                     }
                     throw new UnsupportedOperationException(method.getName());
                 });

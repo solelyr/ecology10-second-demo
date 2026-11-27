@@ -1,5 +1,6 @@
 package com.weaver.seconddev.solelyr.journal.config;
 
+import com.weaver.seconddev.solelyr.ebuilder.util.EbUtil;
 import com.weaver.seconddev.solelyr.journal.entity.JournalUnit;
 import com.weaver.seconddev.solelyr.journal.service.JournalDto;
 import com.weaver.seconddev.solelyr.journal.executor.JournalExecutor;
@@ -17,6 +18,8 @@ import java.util.List;
 import java.util.Map;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.DependsOn;
+import org.springframework.context.annotation.Import;
 
 /**
  * @USER: solelyr
@@ -24,17 +27,17 @@ import org.springframework.context.annotation.Configuration;
  * @DESCRIPTION: 注册公共推送执行器并按租户提供 E10 日志和幂等状态表访问
  */
 @Configuration
+@DependsOn("ebUtil")
+@Import(EbUtil.class)
 public class WorkflowPushCoreConfiguration {
     /** 用于读取日志表和幂等状态表的元数据及记录。 */
     @RpcReference(group = "ebuilderform")
     private IEtFormDatasetService datasetService;
     /** 用于按应用创建表单写入 RPC 服务。 */
     private final PublishKitRuntimeUtil publishKit;
-    /** 按当前租户和物理表名查询 eBuilder 表单所属应用。 */
-    private final SqlExecutor sqlExecutor;
 
-    public WorkflowPushCoreConfiguration(SqlExecutor sqlExecutor, PublishKitRuntimeUtil publishKit) {
-        this.sqlExecutor = sqlExecutor;
+
+    public WorkflowPushCoreConfiguration(PublishKitRuntimeUtil publishKit) {
         this.publishKit = publishKit;
     }
 
@@ -49,29 +52,10 @@ public class WorkflowPushCoreConfiguration {
     }
 
     private JournalDto openForm(String tenantKey, String tableName) {
-        String appId = resolveAppId(tenantKey, tableName);
+        String appId = EbUtil.resolveAppId(tenantKey, tableName);
         RemoteSimpleDataService formDataService = publishKit.buildRpcService(RemoteSimpleDataService.class, "ebuilderform", appId);
         return new JournalDto(datasetService, formDataService, appId, tenantKey, tableName);
     }
 
-    String resolveAppId(String tenantKey, String tableName) {
-        List<Map<String, Object>> rows;
-        try {
-            rows = sqlExecutor.executeQuery(SecondevDataSourceGroup.EBUILDER_APP_GROUP_ID,
-                    "select app_id from ebdf_obj where table_name = ? and tenant_key = ? and delete_type = ?",
-                    tableName, tenantKey, 0);
-        } catch (RuntimeException failure) {
-            throw new WorkflowEsbException(JournalErrors.STORAGE, "查询 OA 表单所属应用失败：" + tableName, failure);
-        }
-        if (rows == null || rows.size() != 1 || rows.get(0) == null) {
-            throw new WorkflowEsbException(JournalErrors.STORAGE, "当前租户的 OA 表单不存在或不唯一：" + tableName);
-        }
-        Map<String, Object> row = rows.get(0);
-        Object value = row.getOrDefault("app_id", row.get("APP_ID"));
-        String appId = value == null ? "" : value.toString().trim();
-        if (appId.isEmpty()) {
-            throw new WorkflowEsbException(JournalErrors.STORAGE, "OA 表单缺少所属应用 ID：" + tableName);
-        }
-        return appId;
-    }
+
 }

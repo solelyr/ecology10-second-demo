@@ -18,6 +18,8 @@ public final class JournalUnit {
     public final String objectId;
     /** 调用方传入的明文幂等键，原样写入 mdj。 */
     public final String key;
+    /** 业务调用方决定本次是否加同键锁并读写幂等状态表。 */
+    public final boolean manageIdempotency;
     /** 触发本次调用的 OA 流程实例 ID。 */
     public final long requestId;
     /** 本次执行的 OA 操作人 ID，用于 E10 表单 RPC 的身份与权限校验。 */
@@ -36,11 +38,18 @@ public final class JournalUnit {
     /** 分别提供稳定的接口操作标识和用于日志追溯的完整请求地址。 */
     public JournalUnit(String tenant, Long employeeId, long requestId, String system, String operation,
                        String objectId, String key, String requestSummary, String httpMethod, String requestUrl) {
+        this(tenant, employeeId, requestId, system, operation, objectId, key, requestSummary, httpMethod, requestUrl, true);
+    }
+
+    /** 按本次调用的策略管理幂等；关闭时 key 可为空，调用日志仍逐次记录。 */
+    public JournalUnit(String tenant, Long employeeId, long requestId, String system, String operation,
+                       String objectId, String key, String requestSummary, String httpMethod, String requestUrl,
+                       boolean manageIdempotency) {
         if (tenant == null || tenant.trim().isEmpty() || requestId <= 0 || employeeId == null || employeeId <= 0) {
             throw new IllegalArgumentException("缺少流程实例、租户或操作人标识");
         }
-        if (key == null || key.trim().isEmpty() || key.length() > 100) {
-            throw new IllegalArgumentException("调用方必须传入 1 至 100 字符的幂等键");
+        if ((manageIdempotency && (key == null || key.trim().isEmpty())) || (key != null && key.length() > 100)) {
+            throw new IllegalArgumentException("启用幂等管理时必须提供键，日志键最多 100 字符");
         }
         if (httpMethod == null || !httpMethod.matches("[!#$%&'*+.^_`|~0-9A-Za-z-]+")) {
             throw new IllegalArgumentException("调用方必须提供有效的 HTTP 方法");
@@ -53,6 +62,7 @@ public final class JournalUnit {
         this.requestUrl = requestUrl;
         this.objectId = objectId;
         this.requestSummary = requestSummary;
+        this.manageIdempotency = manageIdempotency;
         this.key = key;
         this.httpMethod = httpMethod;
     }

@@ -10,7 +10,6 @@ import com.weaver.seconddev.solelyr.workflow.exception.WorkflowEsbException;
 import com.weaver.seconddev.solelyr.workflow.exception.WorkflowEsbExceptionHandler;
 import com.weaver.seconddev.solelyr.workflow.model.WorkflowEsbForm;
 import com.weaver.seconddev.solelyr.workflow.service.WorkflowFormQueryService;
-import java.util.LinkedHashMap;
 import java.util.Map;
 import org.springframework.stereotype.Service;
 
@@ -41,8 +40,7 @@ public class WorkflowEsbAction implements EsbServerlessRpcRemoteInterface {
         try {
             long requestId = requestId(params);
             WorkflowEsbActionHandler<?> handler = resolveHandler(params.get("serviceName"));
-            WorkflowEsbForm result = service.query(requestId, currentEmployeeId(), currentTenantKey());
-            result.setParams(new LinkedHashMap<>(params));
+            WorkflowEsbForm result = service.query(requestId, currentEmployeeId(), currentTenantKey(), params);
             if (handler == null) {
                 return WeaResult.success(result.toMap());
             }

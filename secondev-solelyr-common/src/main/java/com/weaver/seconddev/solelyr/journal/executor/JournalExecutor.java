@@ -97,7 +97,8 @@ public final class JournalExecutor {
     public <T> T execute(String actionId, JournalUnit unit, Function<String, T> restoreResult,
                          Supplier<JournalResult<T>> sendRequest) {
         JournalService journal = journalFactory.apply(unit);
-        return withCallLock(actionId, unit, journal, () -> executeLocked(actionId, journal, restoreResult, sendRequest));
+        Supplier<T> attempt = () -> executeAttempt(actionId, journal, restoreResult, sendRequest);
+        return unit.manageIdempotency ? withCallLock(actionId, unit, journal, attempt) : attempt.get();
     }
 
     /**
@@ -184,8 +185,7 @@ public final class JournalExecutor {
     }
 
     /**
-     * 持锁期间仅查询幂等状态表判断是否已成功。命中时直接还原回执；
-     * 查无记录时新增本次调用日志并发送请求，成功后先保存幂等回执，再更新日志。
+     * 按本次调用策略恢复历史回执或执行适配器，并更新本次调用日志。
      *
      * @param <T> 接口的业务回执类型
      * @param actionId 写入本次调用日志的流程动作执行编号
@@ -195,7 +195,7 @@ public final class JournalExecutor {
      * @return 复用或实际推送取得的业务回执
      * @throws JournalException 适配器调用失败、结果未知，或成功后的 OA 记录写入未获确认
      */
-    private <T> T executeLocked(String actionId, JournalService journal, Function<String, T> restoreResult,
+    private <T> T executeAttempt(String actionId, JournalService journal, Function<String, T> restoreResult,
                                 Supplier<JournalResult<T>> sendRequest) {
         String cachedResult = journal.beginAttempt(actionId);
         if (cachedResult != null) {

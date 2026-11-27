@@ -1,5 +1,9 @@
 package com.weaver.seconddev.solelyr.workflow.service;
 
+import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONObject;
+import com.weaver.common.form.metadata.ModuleSource;
+import com.weaver.file.ud.api.FileDownloadService;
 import com.weaver.seconddev.solelyr.workflow.exception.WorkflowErrors;
 import com.weaver.common.form.data.FormData;
 import com.weaver.common.form.data.detail.FileDetail;
@@ -25,6 +29,7 @@ import com.weaver.workflow.common.entity.formdef.WfpRelateFormEntity;
 import com.weaver.workflow.common.entity.rpc.WfcRequestRpcEntity;
 import com.weaver.workflow.core.api.rest.publicapi.WfcFormFieldRest;
 import com.weaver.workflow.core.api.rest.publicapi.WfcGetRequestDataRest;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -54,6 +59,9 @@ public class WorkflowFormQueryService {
     @Autowired
     private FormTableFieldService formTableFieldService;
 
+    @Autowired
+    private FileDownloadService fileDownloadService;
+
     /**
      * 供 Spring 创建实例，RPC 引用由平台注入。
      */
@@ -70,6 +78,14 @@ public class WorkflowFormQueryService {
      */
     public WorkflowFormQueryService(WfcGetRequestDataRest requestRest, WfcFormFieldRest fieldRest,
                                     FormTableService formTableService, FormTableFieldService formTableFieldService) {
+        this(requestRest, fieldRest, formTableService, formTableFieldService, null);
+    }
+
+    /** 使用指定的平台依赖构造查询服务，包括生成附件下载地址的文件服务。 */
+    public WorkflowFormQueryService(WfcGetRequestDataRest requestRest, WfcFormFieldRest fieldRest,
+                                    FormTableService formTableService, FormTableFieldService formTableFieldService,
+                                    FileDownloadService fileDownloadService) {
+        this.fileDownloadService = fileDownloadService;
         this.requestRest = requestRest;
         this.fieldRest = fieldRest;
         this.formTableService = formTableService;
@@ -89,6 +105,23 @@ public class WorkflowFormQueryService {
             throw new WorkflowEsbException(WorkflowErrors.USER_CONTEXT_INVALID, "缺少有效的操作用户或租户");
         }
         return query(requestId, HrmContextUtil.build(employeeId, tenantKey.trim()));
+    }
+
+    /** 查询表单，并将本次 ESB 参数及其幂等策略一起交给业务处理器。 */
+    public WorkflowEsbForm query(long requestId, Long employeeId, String tenantKey, Map<String, Object> params) {
+        WorkflowEsbForm form = query(requestId, employeeId, tenantKey);
+
+        Map<String, Object> snapshot = params == null ? new LinkedHashMap<>() : new LinkedHashMap<>(params);
+        form.setParams(snapshot);
+        Object value = snapshot.get("idempotent");
+        if (value instanceof BigDecimal) {
+            form.setManageIdempotency(((BigDecimal) value).signum() != 0);
+        } else if (value instanceof Number) {
+            form.setManageIdempotency(((Number) value).doubleValue() != 0);
+        } else {
+            form.setManageIdempotency(!(value instanceof String && "0".equals(((String) value).trim())));
+        }
+        return form;
     }
 
     /**
@@ -312,7 +345,11 @@ public class WorkflowFormQueryService {
         mainText.put(WorkflowEsbForm.ID_KEY, dataId);
         Map<String, TreeMap<Long, Map<String, Object>>> rowsByTable = new LinkedHashMap<>();
         Map<String, TreeMap<Long, Map<String, Object>>> textRowsByTable = new LinkedHashMap<>();
+        Map<String, String> attachmentUrls = new LinkedHashMap<>();
         for (WorkflowFieldInfo info : result.getFields()) {
+            if (!info.isDetail() && info.getColumnName() != null && "FileComponent".equals(info.getComponentKey())) {
+                attachmentUrls.put(info.getColumnName() + "_url", null);
+            }
             if (info.isDetail() && info.getTableName() != null && !rowsByTable.containsKey(info.getTableName())) {
                 rowsByTable.put(info.getTableName(), new TreeMap<Long, Map<String, Object>>());
                 textRowsByTable.put(info.getTableName(), new TreeMap<Long, Map<String, Object>>());
@@ -339,6 +376,10 @@ public class WorkflowFormQueryService {
             if (subForm == null) {
                 putUnique(mainData, column, cell[0], "主表");
                 mainText.put(column, cell[1]);
+                String urlColumn = column + "_url";
+                if (attachmentUrls.containsKey(urlColumn) || hasFileData(detail)) {
+                    attachmentUrls.put(urlColumn, downloadUrls(detail, result.getTenantKey()));
+                }
                 continue;
             }
             String table = detailTableName(subForm, physical, meta);
@@ -356,13 +397,59 @@ public class WorkflowFormQueryService {
                 textRow.put(WorkflowEsbForm.ID_KEY, String.valueOf(detail.getRowId()));
             }
             putUnique(row, column, cell[0], table);
+            if ("FileComponent".equals(field.getComponentKey()) || hasFileData(detail)) {
+                putUnique(row, column + "_url", downloadUrls(detail, result.getTenantKey()), table);
+            }
             textRow.put(column, cell[1]);
         }
+        attachmentUrls.forEach((column, urls) -> putUnique(mainData, column, urls, "主表"));
         for (Map.Entry<String, TreeMap<Long, Map<String, Object>>> entry : rowsByTable.entrySet()) {
             result.getDetailData().put(entry.getKey(), new ArrayList<>(entry.getValue().values()));
             result.getDetailText().put(entry.getKey(),
                     new ArrayList<>(textRowsByTable.get(entry.getKey()).values()));
         }
+    }
+
+    /** 兼容字段定义缺少组件标识但单元格明确声明为文件的数据。 */
+    private boolean hasFileData(FormDataDetail detail) {
+        return (detail.getFileDetails() != null && !detail.getFileDetails().isEmpty())
+                || (detail.getDataOptions() != null && detail.getDataOptions().stream()
+                .anyMatch(option -> option != null && option.getType() == ModuleSource.file));
+    }
+
+    /** 按 valueOf 的附件来源和顺序提取下载地址。 */
+    private String downloadUrls(FormDataDetail detail, String tenantKey) {
+        List<String> urls = new ArrayList<>();
+        List<FormDataOption> options = detail.getDataOptions();
+        if (options != null && !options.isEmpty()) {
+            for (FormDataOption option : options) {
+                if (option != null && option.getOptionObj() != null) {
+                    Object source = option.getOptionObj();
+                    Object json = source instanceof String && JSON.isValidObject((String) source)
+                            ? JSON.parseObject((String) source) : JSON.toJSON(source);
+                    if (json instanceof JSONObject) {
+                        addDownloadUrl(urls, ((JSONObject) json).getString("url"), tenantKey, option.getContent());
+                    }
+                }
+            }
+        } else if (detail.getFileDetails() != null) {
+            for (FileDetail file : detail.getFileDetails()) {
+                if (file != null) {
+                    addDownloadUrl(urls, file.getFileUrl(), tenantKey, file.getFileName());
+                }
+            }
+        }
+        return join(urls);
+    }
+
+    private void addDownloadUrl(List<String> urls, String url, String tenantKey, String fileName) {
+        if (ColumnNameResolver.trimToNull(url) == null || ColumnNameResolver.trimToNull(fileName) == null) {
+            return;
+        }
+        if (fileDownloadService == null) {
+            throw new WorkflowEsbException(WorkflowErrors.PLATFORM_UNAVAILABLE, "附件下载地址需要文件下载服务");
+        }
+        add(urls, fileDownloadService.getDownloadUrl(url, tenantKey, fileName));
     }
 
     /**

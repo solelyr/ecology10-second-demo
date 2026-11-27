@@ -1,6 +1,7 @@
 package com.weaver.seconddev.solelyr.workflow.service;
 
 import com.weaver.common.form.data.FormData;
+import com.weaver.common.form.metadata.ModuleSource;
 import com.weaver.common.form.data.detail.FileDetail;
 import com.weaver.common.form.data.detail.FormDataDetail;
 import com.weaver.common.form.data.option.FormDataOption;
@@ -236,6 +237,7 @@ public final class WorkflowFormQueryServiceTest {
             com.weaver.seconddev.solelyr.workflow.model.WorkflowEsbForm r = service(Collections.singletonList(select), TestSupport.formData("uf_t", c)).query(101L, TestSupport.employee());
             TestSupport.eq("1", r.getMainValue("zt"));
             TestSupport.eq("启用", r.getMainText("zt"));
+            TestSupport.eq(false, r.getMainData().containsKey("zt_url"));
         });
         TestSupport.check("复选/人员多值：optionId 与名称分别以英文逗号拼接", () -> {
             FormField people = TestSupport.mainField(52, "ry", "ry");
@@ -249,11 +251,16 @@ public final class WorkflowFormQueryServiceTest {
         TestSupport.check("附件（dataOptions type=file）：值为文件 ID，显示为文件名", () -> {
             FormField file = TestSupport.mainField(53, "fj", "fj");
             FormDataDetail c = TestSupport.cell(file, null, null, null);
-            c.setDataOptions(Arrays.asList(option("1200694417425448961", "合同附件.pdf"),
-                    option("1200694438975700994", "截图.png")));
+            FormDataOption contract = option("1200694417425448961", "合同附件.pdf");
+            contract.setType(ModuleSource.file);
+            contract.setOptionObj(Collections.singletonMap("url", "contract"));
+            FormDataOption photo = option("1200694438975700994", "截图.png");
+            photo.setOptionObj("{\"url\":\"photo\"}");
+            c.setDataOptions(Arrays.asList(contract, null, photo));
             com.weaver.seconddev.solelyr.workflow.model.WorkflowEsbForm r = service(Collections.singletonList(file), TestSupport.formData("uf_t", c)).query(101L, TestSupport.employee());
             TestSupport.eq("1200694417425448961,1200694438975700994", r.getMainValue("fj"));
             TestSupport.eq("合同附件.pdf,截图.png", r.getMainText("fj"));
+            TestSupport.eq("/download/contract/合同附件.pdf,/download/photo/截图.png", r.getMainValue("fj_url"));
         });
         TestSupport.check("附件无 dataOptions 时取 fileDetails", () -> {
             FormField file = TestSupport.mainField(54, "fj2", "fj2");
@@ -261,10 +268,32 @@ public final class WorkflowFormQueryServiceTest {
             FileDetail f = new FileDetail();
             f.setFileId(777L);
             f.setFileName("a.docx");
+            f.setFileUrl("legacy");
             c.setFileDetails(Collections.singletonList(f));
             com.weaver.seconddev.solelyr.workflow.model.WorkflowEsbForm r = service(Collections.singletonList(file), TestSupport.formData("uf_t", c)).query(101L, TestSupport.employee());
             TestSupport.eq("777", r.getMainValue("fj2"));
             TestSupport.eq("a.docx", r.getMainText("fj2"));
+            TestSupport.eq("/download/legacy/a.docx", r.getMainValue("fj2_url"));
+        });
+        TestSupport.check("附件空值、物理列名和主明细范围", () -> {
+            FormField file = TestSupport.mainField(55, "fjKey", "fj_col");
+            file.setComponentKey("FileComponent");
+            FormDataDetail missing = TestSupport.cell(file, null, null, null);
+            missing.setDataOptions(Collections.singletonList(option("123", "旧文件.pdf")));
+            FormDataDetail child = TestSupport.cell(ITEM, null, 0L, 800L);
+            FormDataOption childFile = option("456", "明细.pdf");
+            childFile.setType(ModuleSource.file);
+            childFile.setOptionObj(Collections.singletonMap("url", "child"));
+            child.setDataOptions(Collections.singletonList(childFile));
+            WorkflowEsbForm r = service(Arrays.asList(file, ITEM), TestSupport.formData("uf_test", missing, child))
+                    .query(101L, TestSupport.employee());
+            TestSupport.eq("123", r.getMainValue("fj_col"));
+            TestSupport.eq(true, r.getMainData().containsKey("fj_col_url"));
+            TestSupport.eq(null, r.getMainValue("fj_col_url"));
+            TestSupport.eq(false, r.getMainData().containsKey("fjKey_url"));
+            TestSupport.eq("/download/child/明细.pdf", r.getDetailRows("uf_test_dt1").get(0).get("wlmc_url"));
+            TestSupport.eq("456", r.getDetailRows("uf_test_dt1").get(0).get("wlmc"));
+            TestSupport.eq(false, r.getMainData().containsKey("wlmc_url"));
         });
         TestSupport.check("明细中的下拉和附件写入 detailData 与 detailText", () -> {
             FormDataDetail sel = TestSupport.cell(ITEM, null, 0L, 800L);
@@ -337,6 +366,6 @@ public final class WorkflowFormQueryServiceTest {
     private static WorkflowFormQueryService service(List<FormField> fields, FormData data, List<FormTable> tables,
                                                     List<FormTableField> columns) {
         return new WorkflowFormQueryService(TestSupport.requestRest(TestSupport.request(101L, 77L, 300L, 9001L)), TestSupport.fieldRest(fields, data),
-                TestSupport.tableService(tables), TestSupport.columnService(columns));
+                TestSupport.tableService(tables), TestSupport.columnService(columns), TestSupport.fileDownloadService());
     }
 }

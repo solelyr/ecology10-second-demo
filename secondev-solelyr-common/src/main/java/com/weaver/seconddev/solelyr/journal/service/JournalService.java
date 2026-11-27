@@ -77,7 +77,7 @@ public final class JournalService {
         startedAtMillis = System.currentTimeMillis();
         String storedData;
         try {
-            storedData = readStoredData();
+            storedData = unit.manageIdempotency ? readStoredData() : null;
         } catch (RuntimeException failure) {
             recordUnsentFailure(actionId, "IDEMPOTENCY_LOOKUP", startedAtMillis, failure);
             throw failure;
@@ -151,7 +151,9 @@ public final class JournalService {
         } catch (JSONException invalid) {
             throw verify("无法保存接口返回对象，请核对成功结果");
         }
-        saveSnapshot(storedData);
+        if (unit.manageIdempotency) {
+            saveSnapshot(storedData);
+        }
         finish(RequestStatus.SUCCESS, storedData, result.httpStatus, result.businessCode, null, null);
     }
 

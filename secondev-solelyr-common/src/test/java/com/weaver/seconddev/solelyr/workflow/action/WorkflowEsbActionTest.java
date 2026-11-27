@@ -39,6 +39,22 @@ public final class WorkflowEsbActionTest {
             eq(true, r.isStatus());
             eq("101", r.getData().get("requestId"));
         });
+        check("动作参数 idempotent 只在值为零时关闭幂等管理", () -> {
+            WorkflowEsbAction entry = action(new StubService(null));
+            Map<String, Object> input = params("requestId", "101");
+            eq(true, entry.execute(input).getData().get("manageIdempotency"));
+            for (Object zero : new Object[]{0, 0L, "0", " 0 ", new java.math.BigDecimal("0.00")}) {
+                input.put("idempotent", zero);
+                eq(false, entry.execute(input).getData().get("manageIdempotency"));
+            }
+            for (Object other : new Object[]{null, "", 1, -1, false, "false", new java.math.BigDecimal("1e-1000")}) {
+                input.put("idempotent", other);
+                eq(true, entry.execute(input).getData().get("manageIdempotency"));
+            }
+            input.remove("idempotent");
+            input.put("Idempotent", "0");
+            eq(true, entry.execute(input).getData().get("manageIdempotency"));
+        });
         check("兼容旧键 requestid 与数字类型", () -> {
             WeaResult<Map<String, Object>> r = action(new StubService(null)).execute(params("requestid", 102L));
             eq(true, r.isStatus());
@@ -64,6 +80,7 @@ public final class WorkflowEsbActionTest {
         });
         check("Spring 可装配 Service 与 Action", () -> {
             DefaultListableBeanFactory factory = beanFactory();
+            factory.registerSingleton("fileDownloadService", TestSupport.fileDownloadService());
             factory.registerSingleton("formTableService", TestSupport.tableService(null));
             factory.registerSingleton("formTableFieldService", TestSupport.columnService(null));
             factory.registerBeanDefinition("solelyrWorkflowFormQueryService",

@@ -27,7 +27,9 @@ public class WorkflowEsbForm implements Serializable {
     private String tenantKey;
     /** 执行本次查询的操作用户 ID。 */
     private Long employeeId;
-    /** 动作入口参数，由 ESB 入口在分发前填充。 */
+    /** 本次流程动作是否使用幂等管理，默认启用。 */
+    private boolean manageIdempotency = true;
+    /** 查询服务组装的动作入口参数。 */
     private Map<String, Object> params = Collections.emptyMap();
     /** 流程实例所属的工作流 ID。 */
     private long workflowId;
@@ -43,9 +45,9 @@ public class WorkflowEsbForm implements Serializable {
     private String mainTableName;
     /** 流程关联表单的字段信息，顺序与平台返回的字段定义一致。 */
     private List<WorkflowFieldInfo> fields = new ArrayList<>();
-    /** 主表数据：数据库列名 → 值。 */
+    /** 主表数据：数据库列名 → 值。附件的“列名_url”保存下载地址，多文件按附件顺序以英文逗号拼接。 */
     private Map<String, Object> mainData = new LinkedHashMap<>();
-    /** 明细数据：明细表数据库表名 → 行列表，每行为 数据库列名 → 值。 */
+    /** 明细数据：明细表数据库表名 → 行列表，每行为 数据库列名 → 值，附件下载地址使用同一行的“列名_url”。 */
     private Map<String, List<Map<String, Object>>> detailData = new LinkedHashMap<>();
     /** 主表显示内容：数据库列名 → 显示文本（选项名称、文件名、人员姓名等，多值以英文逗号拼接）。 */
     private Map<String, Object> mainText = new LinkedHashMap<>();
@@ -102,6 +104,7 @@ public class WorkflowEsbForm implements Serializable {
     public Map<String, Object> toMap() {
         Map<String, Object> map = new LinkedHashMap<>();
         map.put("requestId", String.valueOf(requestId));
+        map.put("manageIdempotency", manageIdempotency);
         map.put("tenantKey", tenantKey);
         map.put("employeeId", employeeId == null ? null : employeeId.toString());
         map.put("workflowId", String.valueOf(workflowId));
